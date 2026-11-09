@@ -43,6 +43,7 @@ Your router updates its own model catalog from a signed feed: new free models, q
 - [How it compares](#how-it-compares)
 - [Features](#features)
 - [Quick start](#quick-start)
+- [서버 운영](#서버-운영)
 - [Desktop app](#desktop-app)
 - [Works with OpenAI-compatible clients](#works-with-openai-compatible-clients)
 - [Languages](#languages)
@@ -176,6 +177,44 @@ Open http://localhost:3001, add your provider keys on the **Keys** page, reorder
 On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** (below). On Android, see the experimental [Termux guide](docs/en/install/02-android-termux.md).
 
 Everything else — Docker Compose, local development, declarative startup config, production builds, LAN access, and backups — is in **[docs/en/install/01-install.md](docs/en/install/01-install.md)**.
+
+## 서버 운영
+
+FreeLLMAPI는 Node.js(Express) 서버 하나가 API(`/v1/...`)와 대시보드(React 빌드 결과물)를 함께 제공하는 앱입니다. 기본 포트는 `3001`, 헬스체크 엔드포인트는 `GET /api/ping` 입니다.
+
+**필수 비밀값:** 운영 모드(`NODE_ENV=production`)에서는 `ENCRYPTION_KEY`(64자리 hex)가 없으면 서버가 시작하지 않습니다. 키는 절대 커밋하지 말고 환경변수 또는 git에 포함되지 않는 `.env` 파일로 주입하세요.
+
+```bash
+cp .env.example .env
+# 키 생성 후 .env 의 ENCRYPTION_KEY 에 붙여넣기
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**Docker Compose (권장)** — 데이터는 `freellmapi-data` 볼륨에 저장되고, 기본적으로 `127.0.0.1` 에만 바인딩됩니다(LAN 공개는 `.env` 에 `HOST_BIND=0.0.0.0`).
+
+```bash
+docker compose up -d          # ghcr 이미지 사용, 로컬 빌드는 docker compose up -d --build
+docker compose ps             # healthy 확인
+curl http://127.0.0.1:3001/api/ping
+```
+
+**Docker 단독 실행**
+
+```bash
+docker build -t freellmapi .
+docker run -d --name freellmapi -p 127.0.0.1:3001:3001 \
+  -e ENCRYPTION_KEY="$ENCRYPTION_KEY" -v freellmapi-data:/app/server/data freellmapi
+```
+
+**Docker 없이 실행** — Node 20.18+ (권장 22) 필요. `serve.sh` 가 `.env` 를 읽고, 의존성 설치·빌드 후 운영 모드로 실행합니다.
+
+```bash
+./serve.sh                    # 빌드 + 실행
+SKIP_BUILD=1 ./serve.sh       # 이미 빌드된 경우 바로 실행
+PORT=8080 ./serve.sh          # 포트 변경
+```
+
+운영 시 참고: 서버는 단일 사용자용이므로 인터넷에 직접 노출하지 말고, 외부 접근이 필요하면 리버스 프록시(TLS) 뒤에 두세요. DB 는 기본적으로 `server/data/` 에 저장되며 `FREEAPI_DB_PATH` 로 경로를 바꿀 수 있습니다. 자세한 설정은 [docs/en/install/01-install.md](docs/en/install/01-install.md) 를 참고하세요.
 
 ## Desktop app
 
